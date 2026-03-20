@@ -1,14 +1,6 @@
 export const runtime = 'nodejs';
 
 import { pool } from '@/lib/db';
-import Parser from 'rss-parser';
-
-const parser = new Parser({
-  customFields: {
-    item: ['link', 'guid']
-  },
-  timeout: 10000 // 10 second timeout
-});
 
 // 🔥 Working RSS Sources
 const RSS_FEEDS = {
@@ -49,7 +41,7 @@ const KEYWORDS = [
 // Helper function to fetch with timeout
 async function fetchWithTimeout(url, options = {}) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
   try {
     const response = await fetch(url, {
@@ -64,6 +56,33 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
+// Simple XML parser for RSS feeds
+function parseRSS(xmlText) {
+  const items = [];
+  
+  try {
+    // Simple regex-based parsing to avoid external libraries
+    const itemMatches = xmlText.match(/<item[^>]*>[\s\S]*?<\/item>/gi) || [];
+    
+    for (const itemXml of itemMatches) {
+      const titleMatch = itemXml.match(/<title[^>]*><!\[CDATA\[(.*?)\]\]><\/title>/i) ||
+                         itemXml.match(/<title[^>]*>(.*?)<\/title>/i);
+      const linkMatch = itemXml.match(/<link[^>]*>(.*?)<\/link>/i);
+      
+      if (titleMatch && linkMatch) {
+        items.push({
+          title: titleMatch[1] ? titleMatch[1].trim() : 'No Title',
+          url: linkMatch[1] ? linkMatch[1].trim() : ''
+        });
+      }
+    }
+  } catch (error) {
+    console.log('XML parsing error:', error.message);
+  }
+  
+  return items;
+}
+
 export async function POST() {
   try {
     console.log('🚀 Starting FULL RSS scraping...');
@@ -75,28 +94,27 @@ export async function POST() {
       try {
         console.log(`📡 Fetching from ${platform}`);
 
-        // Use custom fetch with timeout
-        const feed = await parser.parseURL(url, {
-          customRequest: (url, options, callback) => {
-            fetchWithTimeout(url, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-              }
-            })
-            .then(response => response.text())
-            .then(text => callback(null, { data: text }))
-            .catch(error => callback(error, null));
+        const response = await fetchWithTimeout(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/rss+xml, application/xml, text/xml'
           }
         });
 
-        const items = (feed.items || []).map((item) => ({
-          title: item.title || 'No Title',
-          url: item.link || item.guid || '',
-          platform: platform,
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const xmlText = await response.text();
+        const items = parseRSS(xmlText);
+
+        const processedItems = items.map(item => ({
+          ...item,
+          platform: platform
         }));
 
-        allItems.push(...items);
-        console.log(`✅ ${platform}: ${items.length} items`);
+        allItems.push(...processedItems);
+        console.log(`✅ ${platform}: ${processedItems.length} items`);
 
       } catch (err) {
         console.log(`❌ Error in ${platform}:`, err.message);
