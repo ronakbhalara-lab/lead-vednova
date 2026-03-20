@@ -1,70 +1,115 @@
 export const runtime = 'nodejs';
 
 import { pool } from '@/lib/db';
+import Parser from 'rss-parser';
 
-// RSS feeds for different platforms (Playwright alternative)
+const parser = new Parser();
+
+// 🔥 All RSS Sources
 const RSS_FEEDS = {
-  freelancer: 'https://www.freelancer.com/rss.xml',
-  upwork: 'https://www.upwork.com/ab/feed/jobs?q=web+development',
-  indiamart: 'https://directory.indiamart.com/rss/tradeleads.xml',
-  justdial: 'https://www.justdial.com/Mumbai/rss.xml'
+  freelancer_all: 'https://www.freelancer.com/jobs/rss',
+  freelancer_web: 'https://www.freelancer.com/jobs/web-development/rss',
+  freelancer_mobile: 'https://www.freelancer.com/jobs/mobile-app-development/rss',
+
+  upwork_web: 'https://www.upwork.com/ab/feed/jobs/rss?q=web+development',
+  upwork_mobile: 'https://www.upwork.com/ab/feed/jobs/rss?q=mobile+app+development',
+
+  peopleperhour: 'https://www.peopleperhour.com/feed',
+  guru: 'https://www.guru.com/rss/jobs',
+
+  remoteok_dev: 'https://remoteok.com/remote-dev-jobs.rss',
+  weworkremotely: 'https://weworkremotely.com/categories/remote-programming-jobs.rss',
+
+  reddit_forhire: 'https://www.reddit.com/r/forhire/.rss',
+  reddit_jobs: 'https://www.reddit.com/r/jobs/.rss',
+  reddit_freelance: 'https://www.reddit.com/r/freelance/.rss',
+
+  indeed: 'https://rss.indeed.com/rss?q=web+developer',
 };
+
+// 🔍 Keywords filter
+const KEYWORDS = [
+  'web',
+  'developer',
+  'app',
+  'mobile',
+  'react',
+  'node',
+  'website',
+  'software'
+];
 
 export async function POST() {
   try {
-    console.log('🚀 Starting RSS-based scraping...');
-    
-    // Simulate RSS data (since actual RSS might not work)
-    const mockData = [
-      { 
-        title: 'Need E-commerce Website Development - Budget $500-1000', 
-        url: 'https://www.freelancer.com/projects/web-development/need-ecommerce-website-development', 
-        platform: 'Freelancer' 
-      },
-      { 
-        title: 'React Native App Developer Required - Remote', 
-        url: 'https://www.upwork.com/nx/job/post/react-native-app-developer', 
-        platform: 'UpWork' 
-      },
-      { 
-        title: 'Looking for Website Design Services - Small Business', 
-        url: 'https://directory.indiamart.com/search/website-design-services', 
-        platform: 'IndiaMart' 
-      },
-      { 
-        title: 'Mobile App Development Company Wanted - Mumbai', 
-        url: 'https://www.justdial.com/Mumbai/mobile-app-development-companies', 
-        platform: 'JustDial' 
-      },
-    ];
-    
-    // Insert into database
-    let inserted = 0;
-    for (const item of mockData) {
+    console.log('🚀 Starting FULL RSS scraping...');
+
+    let allItems = [];
+
+    // 🔄 Loop through feeds
+    for (const [platform, url] of Object.entries(RSS_FEEDS)) {
       try {
+        console.log(`📡 Fetching from ${platform}`);
+
+        const feed = await parser.parseURL(url);
+
+        const items = (feed.items || []).map((item) => ({
+          title: item.title || 'No Title',
+          url: item.link || '',
+          platform: platform,
+        }));
+
+        allItems.push(...items);
+
+      } catch (err) {
+        console.log(`❌ Error in ${platform}:`, err.message);
+      }
+    }
+
+    console.log(`📊 Total fetched: ${allItems.length}`);
+
+    // 🔍 Filter by keywords
+    const filteredItems = allItems.filter(item =>
+      KEYWORDS.some(keyword =>
+        item.title.toLowerCase().includes(keyword)
+      )
+    );
+
+    console.log(`🎯 After filter: ${filteredItems.length}`);
+
+    // 💾 Insert into DB
+    let inserted = 0;
+
+    for (const item of filteredItems) {
+      try {
+        if (!item.url) continue;
+
         await pool.query(
           `INSERT INTO leads (title, url, platform)
            VALUES ($1, $2, $3)
            ON CONFLICT (url) DO NOTHING`,
           [item.title, item.url, item.platform]
         );
+
         inserted++;
+
       } catch (err) {
         console.log("DB Error:", err.message);
       }
     }
-    
-    console.log(`💾 Inserted ${inserted} new leads from RSS feeds`);
-    
+
+    console.log(`💾 Inserted: ${inserted}`);
+
     return Response.json({
       success: true,
-      message: 'RSS scraping completed',
-      totalResults: mockData.length,
+      totalFetched: allItems.length,
+      afterFilter: filteredItems.length,
       inserted: inserted,
-      data: mockData,
+      data: filteredItems.slice(0, 50),
     });
+
   } catch (error) {
     console.error('❌ Scraping failed:', error);
+
     return Response.json({
       success: false,
       error: error.message,
