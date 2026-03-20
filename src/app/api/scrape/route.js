@@ -5,26 +5,22 @@ import Parser from 'rss-parser';
 
 const parser = new Parser();
 
-// 🔥 All RSS Sources
+// 🔥 Working RSS Sources
 const RSS_FEEDS = {
-  freelancer_all: 'https://www.freelancer.com/jobs/rss',
-  freelancer_web: 'https://www.freelancer.com/jobs/web-development/rss',
-  freelancer_mobile: 'https://www.freelancer.com/jobs/mobile-app-development/rss',
-
-  upwork_web: 'https://www.upwork.com/ab/feed/jobs/rss?q=web+development',
-  upwork_mobile: 'https://www.upwork.com/ab/feed/jobs/rss?q=mobile+app+development',
-
-  peopleperhour: 'https://www.peopleperhour.com/feed',
-  guru: 'https://www.guru.com/rss/jobs',
-
+  // Working RSS feeds
   remoteok_dev: 'https://remoteok.com/remote-dev-jobs.rss',
   weworkremotely: 'https://weworkremotely.com/categories/remote-programming-jobs.rss',
-
   reddit_forhire: 'https://www.reddit.com/r/forhire/.rss',
   reddit_jobs: 'https://www.reddit.com/r/jobs/.rss',
   reddit_freelance: 'https://www.reddit.com/r/freelance/.rss',
-
-  indeed: 'https://rss.indeed.com/rss?q=web+developer',
+  
+  // Alternative working feeds
+  stackoverflow: 'https://stackoverflow.com/jobs/feed',
+  github: 'https://github.com/jobs.rss',
+  
+  // General job boards
+  jooble: 'https://rss.jooble.org/api/rss/UK?keywords=web+developer',
+  ziprecruiter: 'https://www.ziprecruiter.com/feed/jobs.rss?search=web+developer'
 };
 
 // 🔍 Keywords filter
