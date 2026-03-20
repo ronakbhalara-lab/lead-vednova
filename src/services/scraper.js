@@ -1,10 +1,50 @@
 import { chromium } from 'playwright';
 import { pool } from '@/lib/db';
 
-export async function scrapeFreelancerJobs() {
 
+// Platform configurations
+const PLATFORMS = {
+  freelancer: {
+    url: 'https://www.freelancer.com/jobs',
+    selector: '.JobSearchCard-item',
+    titleSelector: '.JobSearchCard-primary-heading-link',
+    platformName: 'Freelancer'
+  },
+  upwork: {
+    url: 'https://www.upwork.com/nx/find-work/',
+    selector: '.job-tile',
+    titleSelector: '.job-title-link',
+    platformName: 'UpWork'
+  },
+  indiamart: {
+    url: 'https://directory.indiamart.com/',
+    selector: '.listing-card',
+    titleSelector: '.listing-title a',
+    platformName: 'IndiaMart'
+  },
+  justdial: {
+    url: 'https://www.justdial.com/',
+    selector: '.resultbox',
+    titleSelector: '.store-title a',
+    platformName: 'JustDial'
+  }
+};
+
+export async function scrapeAllPlatforms() {
+  const allResults = [];
+  
+  for (const [platformKey, config] of Object.entries(PLATFORMS)) {
+    console.log(`🌐 Starting ${config.platformName} scraper...`);
+    const results = await scrapePlatform(config);
+    allResults.push(...results);
+  }
+  
+  return allResults;
+}
+
+async function scrapePlatform(config) {
   const browser = await chromium.launch({
-    headless: true, // production ma true
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
@@ -16,41 +56,55 @@ export async function scrapeFreelancerJobs() {
   const page = await context.newPage();
 
   try {
-    console.log("🌐 Opening Freelancer...");
+    console.log(`🌐 Opening ${config.platformName}...`);
 
-    await page.goto('https://www.freelancer.com/jobs', {
+    await page.goto(config.url, {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
     });
 
-    // 👇 thodu wait (anti-block)
     await page.waitForTimeout(3000);
 
-    await page.waitForSelector('.JobSearchCard-item', {
-      timeout: 15000,
-    });
+    try {
+      await page.waitForSelector(config.selector, {
+        timeout: 15000,
+      });
+    } catch (err) {
+      console.log(`⚠️  ${config.platformName} selector not found, trying alternative...`);
+      // Fallback selectors for different platforms
+      const fallbackSelectors = {
+        'UpWork': '[data-test="job-tile"]',
+        'IndiaMart': '.card',
+        'JustDial': '.jsx-321'
+      };
+      
+      const fallback = fallbackSelectors[config.platformName];
+      if (fallback) {
+        await page.waitForSelector(fallback, { timeout: 10000 });
+      }
+    }
 
-    const jobs = await page.$$eval('.JobSearchCard-item', cards =>
-      cards.map(card => ({
-        title: card.querySelector('.JobSearchCard-primary-heading-link')?.innerText?.trim(),
-        url: card.querySelector('.JobSearchCard-primary-heading-link')?.href,
-        platform: 'Freelancer',
+    const items = await page.$$eval(config.selector, elements =>
+      elements.map(element => ({
+        title: element.querySelector(config.titleSelector)?.innerText?.trim(),
+        url: element.querySelector(config.titleSelector)?.href,
+        platform: config.platformName,
       }))
     );
 
-    console.log(`✅ Found ${jobs.length} jobs`);
+    console.log(`✅ Found ${items.length} items from ${config.platformName}`);
 
     let inserted = 0;
 
-    for (const job of jobs) {
-      if (!job.url || !job.title) continue;
+    for (const item of items) {
+      if (!item.url || !item.title) continue;
 
       try {
         await pool.query(
           `INSERT INTO leads (title, url, platform)
            VALUES ($1, $2, $3)
            ON CONFLICT (url) DO NOTHING`,
-          [job.title, job.url, job.platform]
+          [item.title, item.url, item.platform]
         );
 
         inserted++;
@@ -59,15 +113,20 @@ export async function scrapeFreelancerJobs() {
       }
     }
 
-    console.log(`💾 Inserted ${inserted} new leads`);
+    console.log(`💾 Inserted ${inserted} new leads from ${config.platformName}`);
 
-    return jobs;
+    return items;
 
   } catch (err) {
-    console.error("❌ Scraper Error:", err.message);
+    console.error(`❌ ${config.platformName} Scraper Error:`, err.message);
     return [];
   } finally {
     await browser.close();
-    console.log("🛑 Browser closed");
+    console.log(`🛑 ${config.platformName} browser closed`);
   }
+}
+
+// Keep original function for backward compatibility
+export async function scrapeFreelancerJobs() {
+  return await scrapePlatform(PLATFORMS.freelancer);
 }

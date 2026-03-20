@@ -1,7 +1,7 @@
 // src/jobs/cron.js
 
 import cron from 'node-cron';
-import { scrapeFreelancerJobs } from '../services/scraper.js';
+import { scrapeAllPlatforms } from '../services/scraper.js';
 import { fetchFeeds } from '../services/fetchFeeds.js';
 import { isValidLead } from '../services/filter.js';
 import { detectPlatform } from '../services/detectPlatform.js';
@@ -18,24 +18,10 @@ cron.schedule('*/5 * * * *', async () => {
   console.log("⏳ Fetching REAL client leads...");
 
   try {
-    // Process Freelancer jobs
-    const jobs = await scrapeFreelancerJobs();
-
-    for (let job of jobs) {
-      const text = job.title + " " + job.description;
-
-      if (!isValidLead(text)) continue;
-
-      await pool.query(
-        `INSERT INTO leads (title, url, platform)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (url) DO NOTHING`,
-        [job.title, job.link, 'Freelancer']
-      );
-
-      console.log("✅ REAL Lead:", job.title);
-    }
-
+    // Process ALL platforms (Freelancer, UpWork, IndiaMart, JustDial)
+    console.log("🌐 Scraping all platforms...");
+    await scrapeAllPlatforms();
+    
     // Process RSS feeds
     const feedItems = await fetchFeeds();
 
