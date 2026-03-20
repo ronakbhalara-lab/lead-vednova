@@ -16,10 +16,26 @@ export async function POST() {
     
     // Simulate RSS data (since actual RSS might not work)
     const mockData = [
-      { title: 'Web Development Project - Freelancer', url: 'https://freelancer.com/projects/123', platform: 'Freelancer' },
-      { title: 'React Developer Needed - UpWork', url: 'https://upwork.com/job/456', platform: 'UpWork' },
-      { title: 'Website Design - IndiaMart', url: 'https://indiamart.com/lead/789', platform: 'IndiaMart' },
-      { title: 'Mobile App Development - JustDial', url: 'https://justdial.com/listing/321', platform: 'JustDial' },
+      { 
+        title: 'Need E-commerce Website Development - Budget $500-1000', 
+        url: 'https://www.freelancer.com/projects/web-development/need-ecommerce-website-development', 
+        platform: 'Freelancer' 
+      },
+      { 
+        title: 'React Native App Developer Required - Remote', 
+        url: 'https://www.upwork.com/nx/job/post/react-native-app-developer', 
+        platform: 'UpWork' 
+      },
+      { 
+        title: 'Looking for Website Design Services - Small Business', 
+        url: 'https://directory.indiamart.com/search/website-design-services', 
+        platform: 'IndiaMart' 
+      },
+      { 
+        title: 'Mobile App Development Company Wanted - Mumbai', 
+        url: 'https://www.justdial.com/Mumbai/mobile-app-development-companies', 
+        platform: 'JustDial' 
+      },
     ];
     
     // Insert into database
