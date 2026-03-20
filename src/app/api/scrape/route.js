@@ -6,7 +6,8 @@ import Parser from 'rss-parser';
 const parser = new Parser({
   customFields: {
     item: ['link', 'guid']
-  }
+  },
+  timeout: 10000 // 10 second timeout
 });
 
 // 🔥 Working RSS Sources
@@ -45,6 +46,24 @@ const KEYWORDS = [
   'php'
 ];
 
+// Helper function to fetch with timeout
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
 export async function POST() {
   try {
     console.log('🚀 Starting FULL RSS scraping...');
@@ -56,9 +75,17 @@ export async function POST() {
       try {
         console.log(`📡 Fetching from ${platform}`);
 
+        // Use custom fetch with timeout
         const feed = await parser.parseURL(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          customRequest: (url, options, callback) => {
+            fetchWithTimeout(url, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+              }
+            })
+            .then(response => response.text())
+            .then(text => callback(null, { data: text }))
+            .catch(error => callback(error, null));
           }
         });
 
@@ -69,6 +96,7 @@ export async function POST() {
         }));
 
         allItems.push(...items);
+        console.log(`✅ ${platform}: ${items.length} items`);
 
       } catch (err) {
         console.log(`❌ Error in ${platform}:`, err.message);
