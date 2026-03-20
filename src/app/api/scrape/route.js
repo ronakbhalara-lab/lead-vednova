@@ -3,7 +3,11 @@ export const runtime = 'nodejs';
 import { pool } from '@/lib/db';
 import Parser from 'rss-parser';
 
-const parser = new Parser();
+const parser = new Parser({
+  customFields: {
+    item: ['link', 'guid']
+  }
+});
 
 // 🔥 Working RSS Sources
 const RSS_FEEDS = {
@@ -32,7 +36,13 @@ const KEYWORDS = [
   'react',
   'node',
   'website',
-  'software'
+  'software',
+  'frontend',
+  'backend',
+  'fullstack',
+  'javascript',
+  'python',
+  'php'
 ];
 
 export async function POST() {
@@ -46,11 +56,15 @@ export async function POST() {
       try {
         console.log(`📡 Fetching from ${platform}`);
 
-        const feed = await parser.parseURL(url);
+        const feed = await parser.parseURL(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        });
 
         const items = (feed.items || []).map((item) => ({
           title: item.title || 'No Title',
-          url: item.link || '',
+          url: item.link || item.guid || '',
           platform: platform,
         }));
 
@@ -77,7 +91,15 @@ export async function POST() {
 
     for (const item of filteredItems) {
       try {
+        // Validate URL using WHATWG URL API
         if (!item.url) continue;
+        
+        try {
+          new URL(item.url);
+        } catch {
+          console.log(`⚠️ Invalid URL: ${item.url}`);
+          continue;
+        }
 
         await pool.query(
           `INSERT INTO leads (title, url, platform)
